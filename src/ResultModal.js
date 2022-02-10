@@ -57,11 +57,13 @@ const ModalTitle = styled.p`
   font-size: 24px;
   font-weight: bold;
   text-transform: uppercase;
+  color: indianred;
 `;
 
 const ModalContent = styled.p`
   flex: 1 1 auto;
   text-align: center;
+  color: seagreen;
 `;
 
 const ModalFooter = styled.div`

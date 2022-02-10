@@ -152,7 +152,7 @@ const board = new Board();
 
     return gameState === GAME_STATES.notStarted ? (
     <Screen>
-      <Inner>
+        <Inner>
         <ChooseText>Select difficulty</ChooseText>
         <select onChange={changeMode} value={mode}>
           {Object.keys(GAME_MODES).map(key => {
@@ -189,12 +189,18 @@ const board = new Board();
         );
       })}
 
-      <ResultModal
-        isOpen={modalOpen}
-        winner={winner}
-        close={() => setModalOpen(false)}
-        startNewGame={startNewGame}
-      />
+          <Strikethrough
+            styles={
+              gameState === GAME_STATES.over && board.getStrikethroughStyles()
+            }
+          />
+
+          <ResultModal
+            isOpen={modalOpen}
+            winner={winner}
+            close={() => setModalOpen(false)}
+            startNewGame={startNewGame}
+          />
     </Container>
   );
 };
@@ -218,6 +224,14 @@ const Square = styled.div`
   &:hover {
     cursor: pointer;
   }
+`;
+
+const Strikethrough = styled.div`
+  position: absolute;
+  ${({ styles }) => styles}
+  background-color: indianred;
+  height: 5px;
+  width: ${({ styles}) => !styles && "0px"};
 `;
 
 Square.displayName = "Square";
