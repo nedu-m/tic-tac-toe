@@ -47,4 +47,11 @@ export default class Board {
   clone = () => {
     return new Board(this.grid.concat());
   };
+
+  makeMove = (square, player) => {
+    if (this.grid[square] === null) {
+      this.grid[square] = player;
+    }
+  };
+
 }

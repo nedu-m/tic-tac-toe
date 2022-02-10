@@ -1,29 +1,40 @@
 import React, { useCallback, useEffect, useState } from "react";
 import styled from "styled-components";
-import { DIMS, PLAYER_X, PLAYER_O, SQUARE_DIMS, GAME_STATES } from "./constants";
+import {
+  DIMS,
+  DRAW,
+  PLAYER_X,
+  PLAYER_O,
+  SQUARE_DIMS,
+  GAME_STATES,
+  GAME_MODES
+} from "./constants";
 import { getRandomInt, switchPlayer } from "./utils";
+import { border } from "./styles";
 import Board from "./Board";
+import { minimax } from "./minimax";
+import { ResultModal } from "./ResultModal";
 
 const arr = new Array(DIMS ** 2).fill(null);
-
 const board = new Board();
 
-const TicTacToe = () => {
-  const [grid, setGrid] = useState(arr);
-  const [players, setPlayers] = useState({
-    human: null,
-    computer: null
-  });
-  const [gameState, setGameState] = useState(
-    GAME_STATES.notStarted);
+  const TicTacToe = () => {
+    const [grid, setGrid] = useState(arr);
+    const [players, setPlayers] = useState({
+      human: null,
+      computer: null
+    });
+    const [gameState, setGameState] = useState(
+      GAME_STATES.notStarted);
+    const [mode, setMode] = useState(GAME_MODES.medium);
 
-  const choosePlayer = option => {
-    setPlayers({ human: option, computer: switchPlayer(option) });
-    setGameState(GAME_STATES.inProgress);
-    setNextMove(PLAYER_X);
-  };
+    const choosePlayer = option => {
+      setPlayers({ human: option, computer: switchPlayer(option) });
+      setGameState(GAME_STATES.inProgress);
+      setNextMove(PLAYER_X);
+    };
 
-  const move = useCallback(
+    const move = useCallback(
       (index, player) => {
         if (player && gameState === GAME_STATES.inProgress) {
           setGrid(grid => {
@@ -36,44 +47,124 @@ const TicTacToe = () => {
       [gameState]
     );
 
-  const computerMove = useCallback(() => {
-    let index = getRandomInt(0, 8);
-    while (grid[index]) {
-      index = getRandomInt(0, 8);
-    }
-    move(index, players.computer);
-    setNextMove(players.human);
-  }, [move, grid, players]);
+    const humanMove = index => {
+      if (!grid[index] && nextMove === players.human) {
+        move(index, players.human);
+        setNextMove(players.computer);
+      }
+    };
 
-  const humanMove = index => {
-    if (!grid[index] && nextMove === players.human) {
-      move(index, players.human);
-      setNextMove(players.computer);
-    }
-  };
+    const computerMove = useCallback(() => {
+      // Passed a copy of the grid
+      const board = new Board([...grid]);
+      const emptyIndices = board.getEmptySquares(grid);
+      let index;
 
-  const [nextMove, setNextMove] = useState(null);
+      switch (mode) {
+        case GAME_MODES.easy:
+          index = getRandomInt(0, 8);
+          while (!emptyIndices.includes(index)) {
+            index = getRandomInt(0, 8);
+          }
+          break;
+        case GAME_MODES.medium:
+          // Implementing Medium level which is half of minimax moves
+          const smartMove = !board.isEmpty(grid) && Math.random() < 0.5;
+          if (smartMove) {
+            index = minimax(board, players.computer)[1];
+          } else {
+            index = getRandomInt(0, 8);
+            while (!emptyIndices.includes(index)) {
+              index = getRandomInt(0, 8);
+            }
+          }
+          break;
+        case GAME_MODES.difficult:
+        default:
+          index = board.isEmpty(grid)
+            ? getRandomInt(0, 8)
+            : minimax(board, players.computer)[1];
+      }
+      if (!grid[index]) {
+        move(index, players.computer);
+        setNextMove(players.human);
+      }
+    }, [move, mode, grid, players]);
 
-  const [winner, setWinner] = useState(null);
+    const startNewGame = () => {
+      setGameState(GAME_STATES.notStarted);
+      setGrid(arr);
+      setModalOpen(false);
+    };
 
-  useEffect(() => {
-    let timeout;
-    if (
-      nextMove !== null &&
-      nextMove === players.computer &&
-      gameState !== GAME_STATES.over
-    ) {
-      //Delay computer moves to make them appear natural
-      timeout = setTimeout(() => {
-        computerMove();
-      }, 500);
-    }
-    return () => timeout && clearTimeout(timeout);
-  }, [nextMove, computerMove, players.computer, gameState]);
+    const changeMode = e => {
+      setMode(e.target.value);
+    };
+
+    const [nextMove, setNextMove] = useState(null);
+    const [winner, setWinner] = useState(null);
+    const [modalOpen, setModalOpen] = useState(false);
+
+    /**
+     * On every move, check if there is a winner.
+     * If yes, set game state to over and open result modal
+    */
+    useEffect(() => {
+      const winner = board.getWinner(grid);
+      const declareWinner = winner => {
+        let winnerStr;
+        switch (winner) {
+          case PLAYER_X:
+            winnerStr = "Player X wins!";
+            break;
+          case PLAYER_O:
+            winnerStr = "Player O wins!";
+            break;
+          case DRAW:
+          default:
+            winnerStr = "It's a draw";
+        }
+        setGameState(GAME_STATES.over);
+        setWinner(winnerStr);
+        setTimeout(() => setModalOpen(true), 300);
+      };
+      if (winner !== null && gameState !== GAME_STATES.over) {
+        declareWinner(winner);
+      }
+    }, [gameState, grid, nextMove]);
+
+    /* Make computer move when it's computer's turn */
+    useEffect(() => {
+      let timeout;
+      if (
+        nextMove !== null &&
+        nextMove === players.computer &&
+        gameState !== GAME_STATES.over
+      ) {
+        //Delay computer moves to make them appear natural
+        timeout = setTimeout(() => {
+          computerMove();
+        }, 500);
+      }
+      return () => timeout && clearTimeout(timeout);
+    }, [nextMove, computerMove, players.computer, gameState]);
 
 
-  return gameState === GAME_STATES.notStarted ? (
+    return gameState === GAME_STATES.notStarted ? (
     <Screen>
+      <Inner>
+        <ChooseText>Select difficulty</ChooseText>
+        <select onChange={changeMode} value={mode}>
+          {Object.keys(GAME_MODES).map(key => {
+            const gameMode = GAME_MODES[key];
+            return (
+              <option key={gameMode} value={gameMode}>
+                {key}
+              </option>
+            );
+          })}
+        </select>
+      </Inner>
       <Inner>
         <ChooseText>Choose your player</ChooseText>
         <ButtonRow>
@@ -88,15 +179,22 @@ const TicTacToe = () => {
       {grid.map((value, index) => {
         const isActive = value !== null;
 
-      return (
-        <Square
-          key={index}
-          onClick={() => humanMove(index)}
-        >
-          {isActive && <Marker>{value === PLAYER_X ? "X" : "O"}</Marker>}
-        </Square>
+        return (
+          <Square
+            key={index}
+            onClick={() => humanMove(index)}
+          >
+            {isActive && <Marker>{value === PLAYER_X ? "X" : "O"}</Marker>}
+          </Square>
         );
       })}
+
+      <ResultModal
+        isOpen={modalOpen}
+        winner={winner}
+        close={() => setModalOpen(false)}
+        startNewGame={startNewGame}
+      />
     </Container>
   );
 };
@@ -115,16 +213,20 @@ const Square = styled.div`
   align-items: center;
   width: ${SQUARE_DIMS}px;
   height: ${SQUARE_DIMS}px;
-  border: 1px solid black;
+  ${border};
 
   &:hover {
     cursor: pointer;
   }
 `;
 
+Square.displayName = "Square";
+
 const Marker = styled.p`
   font-size: 68px;
 `;
+
+const ChooseText = styled.p``;
 
 const ButtonRow = styled.div`
   display: flex;
@@ -140,7 +242,5 @@ const Inner = styled.div`
   align-items: center;
   margin-bottom: 30px;
 `;
-
-const ChooseText = styled.p``;
 
 export default TicTacToe;
